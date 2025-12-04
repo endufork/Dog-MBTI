@@ -656,7 +656,85 @@ def reset_quiz():
     st.rerun()
 
 # --- 界面渲染 ---
-if not st.session_state.finished:
+# --- Session State 初始化 (保持不变) ---
+if 'scores' not in st.session_state:
+    st.session_state.scores = {"E": 0, "I": 0, "S": 0, "N": 0, "T": 0, "F": 0, "J": 0, "P": 0}
+if 'current_q_index' not in st.session_state:
+    st.session_state.current_q_index = 0
+if 'finished' not in st.session_state:
+    st.session_state.finished = False
+# 新增：增加一个状态来判断是否点击了开始按钮
+if 'started' not in st.session_state:
+    st.session_state.started = False
+
+# --- 逻辑函数 (保持不变) ---
+def handle_answer(score_tuple):
+    dim, points = score_tuple
+    st.session_state.scores[dim] += points
+    if st.session_state.current_q_index < len(questions) - 1:
+        st.session_state.current_q_index += 1
+    else:
+        st.session_state.finished = True
+    st.rerun()
+
+def calculate_mbti():
+    s = st.session_state.scores
+    res = ""
+    res += "E" if s["E"] >= s["I"] else "I"
+    res += "S" if s["S"] >= s["N"] else "N"
+    res += "T" if s["T"] >= s["F"] else "F"
+    res += "J" if s["J"] >= s["P"] else "P"
+    return res
+
+def reset_quiz():
+    st.session_state.scores = {"E": 0, "I": 0, "S": 0, "N": 0, "T": 0, "F": 0, "J": 0, "P": 0}
+    st.session_state.current_q_index = 0
+    st.session_state.finished = False
+    st.session_state.started = False # 重置时回到封面
+    st.rerun()
+
+def start_quiz():
+    st.session_state.started = True
+    st.rerun()
+
+# ==========================================
+#      下面是修改后的 UI 渲染部分
+# ==========================================
+
+# 1. 如果还没开始，显示【封面页】
+if not st.session_state.started:
+    try:
+        # 显示主图 (请确保文件名 banner.png 与你上传的一致)
+        st.image("banner.png", use_container_width=True)
+    except:
+        # 如果找不到图片，显示一个占位符，防止报错
+        st.warning("请确保图片 banner.png 已上传到 GitHub")
+    
+    st.title("🐾 D-MBTI: 深度犬格测试")
+    st.markdown("""
+    ### 你的狗狗到底在想什么？
+    
+    这不仅仅是一个测试，这是一次走进狗狗内心的旅程。
+    
+    我们将通过 **50+ 道行为心理学题目**，分析你家狗狗的：
+    - ⚡ **能量来源** (E vs I)
+    - 🧠 **思维模式** (S vs N)
+    - ❤️ **决策逻辑** (T vs F)
+    - 📅 **生活态度** (J vs P)
+    
+    准备好揭开它的性格谜底了吗？
+    """)
+    
+    st.divider()
+    
+    # 开始按钮居中且大一点
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 开始测试 (Start Quiz)", use_container_width=True):
+            start_quiz()
+
+# 2. 如果开始了但没结束，显示【答题页】
+elif not st.session_state.finished:
     # 进度条
     progress = (st.session_state.current_q_index + 1) / len(questions)
     st.progress(progress)
@@ -672,14 +750,13 @@ if not st.session_state.finished:
         if st.button(opt["label"], key=opt["label"]):
             handle_answer(opt["score"])
 
+# 3. 如果结束了，显示【结果页】
 else:
-    # 结果页
     mbti_type = calculate_mbti()
     result_data = results_analysis.get(mbti_type, results_analysis["ISTJ"])
     
     st.balloons()
     
-    # 结果头部
     st.markdown(f"<h1 style='text-align: center; color: #FF4B4B;'>{mbti_type}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h2 style='text-align: center;'>{result_data['title']}</h2>", unsafe_allow_html=True)
     
@@ -698,5 +775,5 @@ else:
     st.success(result_data['advice'])
     
     st.divider()
-    if st.button("🔄 重测一次"):
+    if st.button("🔄 返回首页重测"):
         reset_quiz()
